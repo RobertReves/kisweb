@@ -5,8 +5,15 @@ CREATE TABLE IF NOT EXISTS tenants (
   token_hash TEXT NOT NULL,         -- az admin jelszó SHA-256 lenyomata (a jelszót sehol nem tároljuk)
   tg_chat TEXT NOT NULL DEFAULT '', -- a tulajdonos Telegram chat id-ja (üres = nincs értesítés)
   banner TEXT NOT NULL DEFAULT '',
-  closed TEXT NOT NULL DEFAULT '[]' -- zárva tartott napok JSON tömbben
+  closed TEXT NOT NULL DEFAULT '[]', -- zárva tartott napok JSON tömbben
+  place_id TEXT NOT NULL DEFAULT '', -- Google Places azonosító (üres = nincs élő Google-vélemény)
+  reviews TEXT NOT NULL DEFAULT '',  -- a Google-válasz gyorsítótára (JSON), 12 óránként frissül
+  reviews_at INTEGER NOT NULL DEFAULT 0 -- a gyorsítótár ideje (ms)
 );
+-- Meglévő adatbázis bővítése (egyszer, külön-külön futtatva):
+--   ALTER TABLE tenants ADD COLUMN place_id TEXT NOT NULL DEFAULT '';
+--   ALTER TABLE tenants ADD COLUMN reviews TEXT NOT NULL DEFAULT '';
+--   ALTER TABLE tenants ADD COLUMN reviews_at INTEGER NOT NULL DEFAULT 0;
 CREATE TABLE IF NOT EXISTS bookings (
   id TEXT PRIMARY KEY,
   site TEXT NOT NULL, date TEXT NOT NULL, start INTEGER NOT NULL, dur INTEGER NOT NULL,

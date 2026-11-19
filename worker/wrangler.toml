@@ -12,4 +12,6 @@ crons = ["0 5 * * *"]   # reggeli összefoglaló + régi foglalások törlése (
 
 # Telegram bot token: wrangler secret put TG_TOKEN
 # Turnstile (ingyenes, dash.cloudflare.com > Turnstile > Add site): wrangler secret put TURNSTILE_SECRET
+# Google-vélemények: Google Cloud > Places API (New) bekapcsolása, API-kulcs: wrangler secret put GOOGLE_KEY
+# Ügyfelenként: UPDATE tenants SET place_id='ChIJ...' WHERE slug='...';  (Place ID: developers.google.com/maps/documentation/places/web-service/place-id)
 # A site key-t az ugyfel config.js-enek "turnstile" mezojebe kell irni. Titok nelkul az ellenorzes ki van kapcsolva (csak fejleszteshez!).

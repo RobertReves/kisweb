@@ -20,7 +20,7 @@
 <div id="banner" hidden></div>
 <header class="top">
   <b id="brand"></b>
-  <nav class="links"><a href="#szolgaltatasok">Szolgáltatások</a><a href="#velemenyek">Vélemények</a><a href="#kapcsolat">Kapcsolat</a></nav>
+  <nav class="links"><a href="#szolgaltatasok">Szolgáltatások</a><a href="#naptar">Naptár</a><a href="#velemenyek">Vélemények</a><a href="#kapcsolat">Kapcsolat</a></nav>
   <span id="openbadge" class="badge"></span>
 </header>
 
@@ -43,6 +43,14 @@
     <ul id="services" class="list"></ul>
   </section>
 
+  <section id="naptar" class="rv">
+    <h2>Szabad időpontok</h2>
+    <div class="nav"><button id="calprev" class="btn ghost sm" aria-label="Előző hónap">◀</button><b id="calmon"></b><button id="calnext" class="btn ghost sm" aria-label="Következő hónap">▶</button></div>
+    <div id="cal" class="cal pub"></div>
+    <p class="muted small"><span class="dot free"></span> van szabad időpont · <span class="dot full"></span> betelt / zárva</p>
+    <div id="calday" aria-live="polite"></div>
+  </section>
+
   <section class="rv" data-has="products">
     <h2>Termékeink</h2>
     <div id="products" class="cards"></div>
@@ -60,6 +68,7 @@
 
   <section id="velemenyek" class="rv" data-has="reviews">
     <h2>Vendégeink mondták</h2>
+    <p id="gsrc" class="pill" hidden></p>
     <div id="reviews" class="cards"></div>
     <p><a id="reviewlink" class="btn ghost" target="_blank" rel="noopener" hidden>Írjon értékelést a Google-on</a></p>
   </section>
@@ -105,6 +114,8 @@
   <small class="pv">Adatait csak az ügyintézéshez használjuk · <a href="adatvedelem.html">Adatkezelés</a></small>
 </aside>
 
+<script src="core/nlu.js"></script>
+<script src="core/compose.js"></script>
 <script src="core/app.js"></script>
 </body>
 </html>

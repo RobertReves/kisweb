@@ -1,1 +1,9 @@
-{ "private": true, "devDependencies": { "jsdom": "^26.0.0" } }
+{
+  "private": true,
+  "scripts": {
+    "test": "node nlu.test.cjs && node compose.test.cjs && node client.test.cjs && node admin.test.cjs && node worker.test.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^26.0.0"
+  }
+}

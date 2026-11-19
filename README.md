@@ -4,7 +4,8 @@
 template/          a sablon: ügyfelenként csak az itt lévő fájlok különböznek
   config.js          MINDEN ügyfél-specifikus adat (név, árak, nyitvatartás, színek, téma…)
   index.html, admin.html, adatvedelem.html, 404.html, manifest, robots, sitemap
-  core/              a közös kód (app.js, admin.js, style.css) – itt fejlesztesz tovább
+  core/              a közös kód (app.js, nlu.js, admin.js, style.css) – itt fejlesztesz tovább
+                     nlu.js = a chatbot értelmezője (DOM nélküli könyvtár: kulcsszó-pontozás, elütés- és ragozástűrés, dátum/idő, GYIK-keresés)
   examples/          kész configok más típusú vállalkozáshoz (bolt, szerviz)
 worker/            EGY Cloudflare Worker + EGY D1 adatbázis az összes ügyfélnek
 new-customer.ps1   új ügyfél létrehozása
@@ -42,13 +43,15 @@ Nem véd: valaki, aki valódi böngészőben, valódi telefonszámokkal, lassan,
 3. `wrangler d1 execute kisweb --remote --file schema.sql`
 4. Telegram: @BotFather -> `/newbot` -> token: `wrangler secret put TG_TOKEN`
 5. Turnstile: dash.cloudflare.com > Turnstile > Add site (a domain(ek)), a titkos kulcs: `wrangler secret put TURNSTILE_SECRET`. A site key megy a config.js `turnstile` mezőjébe. **Ne hagyd ki éles ügyfélnél**, titok nélkül a védelem ki van kapcsolva.
-6. `wrangler deploy` -> a kapott cím az `-Api` paraméter
+6. Google-vélemények (opcionális): Google Cloud > Places API (New) bekapcsolása, API-kulcs: `wrangler secret put GOOGLE_KEY`. Meglévő adatbázisnál a `schema.sql` végén lévő 3 `ALTER TABLE` egyszeri futtatása.
+7. `wrangler deploy` -> a kapott cím az `-Api` paraméter
 
 ## Új ügyfél
 1. `.\new-customer.ps1 -Slug szalon-eva -Name "Szalon Éva" -Url https://szalon-eva.hu -Api https://kisweb-api.<fiók>.workers.dev [-Core ...]`
 2. `customers\<slug>\config.js` kitöltése, a kiírt `INSERT` lefuttatása, az admin jelszó átadása
 3. A mappa külön GitHub repo, Settings > Pages. Cloudflare DNS: CNAME `<felhasználó>.github.io` (a CNAME fájl a repóban van)
-4. Telegram: az ügyfél ír a botnak, a chat id-t `https://api.telegram.org/bot<TOKEN>/getUpdates` mutatja, `UPDATE tenants SET tg_chat=... WHERE slug=...`
+4. Élő Google-vélemények: `UPDATE tenants SET place_id='ChIJ...' WHERE slug='...';` (Place ID kereső: developers.google.com/maps/documentation/places/web-service/place-id), a config.js-ben `googleReviews: true`. A Worker 12 óránként frissíti (ügyfelenként ~60 Google-hívás/hó), a Google legfeljebb 5 véleményt ad. Hiba vagy üres válasz esetén a config.js `reviews` listája marad.
+5. Telegram: az ügyfél ír a botnak, a chat id-t `https://api.telegram.org/bot<TOKEN>/getUpdates` mutatja, `UPDATE tenants SET tg_chat=... WHERE slug=...`
 
 ## Tesztek
 ```
@@ -56,3 +59,16 @@ node --no-warnings tests/worker.test.mjs       # Node 22+
 cd tests && npm i && node client.test.cjs
 ```
 Helyi megtekintés: `cd template`, `python -m http.server 8080`, http://localhost:8080/?demo
+
+## Chatbot (core/nlu.js + core/compose.js + core/app.js)
+- Teljesen a böngészőben fut, tanult modell, WebGPU és külső szolgáltatás nélkül; a beírt szöveg sehova nem megy el.
+- **nlu.js – megérti**: elütés-, ragozás- és helyesírás-tűrő kulcsszavak, fogalomcsoportok (autó ~ parkolás), jelentés-keresés (karakter-n-gram vektorok + fogalmak koszinusz-hasonlósága), dátum/idő ("jövő péntek", "fél 3", "24-én"), szolgáltatás/munkatárs, tagadás, "legolcsóbb", "5000 alatt", bemutatkozás, javítás ("inkább kedden").
+- **compose.js – megfogalmazza**: tegez/magáz (átveszi a vendég hangnemét), változatos mondatok, következtetés a tényekből ("vasárnap zárva, legközelebb hétfőn 09:00-kor nyitunk"), bizonytalan találatnál kimondja, mit értett.
+- **app.js – végrehajtja és emlékszik**: futó foglalás módosítása, kérdés után visszatér a foglaláshoz, megjegyzi a nevet/telefont (csak a lap életében), legkorábbi szabad időpont, szavankénti "gépelés".
+- A tudását a `config.js`-ből veszi: `faq`, `products`, `perks`, `services`, `staff`. Minél több GYIK-kérdés, annál okosabb a bot.
+- Saját szinonimák (opcionális): `syn: [["hajvagas", "nyiras"]]` a configban.
+- **Gépelés**: a bot minden üzenete előtt hárompontos jelzés látszik 1–4 mp-ig (a válasz hosszától függ; `botDelay: [1000, 4000]` a configban); gépelés közben a régi gombok le vannak tiltva. Csökkentett mozgásnál azonnal válaszol.
+- **Telefon**: a chat alatt a háttéroldal rögzítve van (bezáráskor ugyanoda áll vissza), a panel követi a billentyűzet miatt összement látható területet, a hosszú válasz elejére görget.
+- **Nyilvános naptár** (`#naptar`, csak `api` + foglalás esetén): a vendég a szabad/betelt napokat és a napi időpontokat látja (személyes adat nélkül, percenként frissül); szabad időpontra kattintva a chat az előtöltött nappal és idővel indítja a foglalást.
+- Admin (`admin.html`): havi naptár a foglalások számával, a kijelölt nap idővonala munkatársanként, lista a hívás/emlékeztető/törlés gombokkal.
+- Tesztek: `cd tests && npm i && npm test` (értelmező ~3800, mondatösszeállító ~1100 ellenőrzés, kliens + véletlen bejárás + naptár + Google-vélemények + telefon, admin naptár, worker).

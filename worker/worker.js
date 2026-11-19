@@ -48,6 +48,30 @@ const tg = (env, chat, text) => env.TG_TOKEN && chat
   ? fetch(`https://api.telegram.org/bot${env.TG_TOKEN}/sendMessage`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ chat_id: chat, text }) }).catch(() => {})
   : null;
 
+// Google-vélemények: a Places API-t csak a Worker hívja (a kulcs nem kerül a böngészőbe), az eredmény 12 óráig D1-ben gyorsítótárazva.
+// A Google legfeljebb 5 (a legrelevánsabb) véleményt ad; az értékelés átlaga és száma az összes értékelésre vonatkozik.
+const REVIEWS_TTL = 12 * 3600e3;
+async function reviews(env, t) {
+  if (!t.place_id || !env.GOOGLE_KEY) return {};
+  const cached = () => { try { return JSON.parse(t.reviews); } catch { return {}; } };
+  if (t.reviews && Date.now() - t.reviews_at < REVIEWS_TTL) return cached();
+  // "lefoglaljuk" a frissítést: egyszerre egy kérés megy a Google-nek, és hiba esetén 1 perc múlva próbáljuk újra
+  await env.DB.prepare("UPDATE tenants SET reviews_at=? WHERE slug=?").bind(Date.now() - REVIEWS_TTL + 60e3, t.slug).run();
+  const g = await fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(t.place_id)}?languageCode=hu`, { headers: { "X-Goog-Api-Key": env.GOOGLE_KEY, "X-Goog-FieldMask": "rating,userRatingCount,reviews" } })
+    .then(r => r.ok ? r.json() : null).catch(() => null);
+  if (!g || typeof g.rating !== "number") return cached(); // hiba: a régi adat (vagy semmi) marad
+  const out = {
+    score: Math.round(g.rating * 10) / 10, count: Number(g.userRatingCount) || 0,
+    write: "https://search.google.com/local/writereview?placeid=" + encodeURIComponent(t.place_id),
+    list: (g.reviews || []).filter(r => r.text?.text).slice(0, 5).map(r => ({
+      who: line(r.authorAttribution?.displayName, 60) || "Google-felhasználó", stars: Math.min(5, Math.max(1, Math.round(r.rating) || 5)),
+      text: para(r.text.text, 500), when: line(r.relativePublishTimeDescription, 40),
+    })),
+  };
+  await env.DB.prepare("UPDATE tenants SET reviews=?, reviews_at=? WHERE slug=?").bind(JSON.stringify(out), Date.now(), t.slug).run();
+  return out;
+}
+
 // shortcut: a nyitvatartást a kliens ismeri, a Worker nem; közvetlen API-hívással nyitvatartáson kívüli időpont is foglalható. A tulajdonos látja és törölheti; ha zavaró, tároljuk az órákat a tenants táblában.
 async function book(env, t, raw, admin) {
   const b = { date: raw.date, start: raw.start, dur: raw.dur, name: line(raw.name, 60), phone: line(raw.phone, 30), service: line(raw.service, 80), staff: line(raw.staff ?? "", 40) };
@@ -97,6 +121,8 @@ export default {
 
     /* ---- nyilvános ---- */
     if (p === "/info") return R({ banner: t.banner, closed: JSON.parse(t.closed) });
+
+    if (p === "/reviews") return R(await reviews(env, t));
 
     if (p === "/busy") { // csak idősáv, személyes adat nélkül
       const [from, to] = [q("from"), q("to")];

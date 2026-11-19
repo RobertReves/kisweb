@@ -16,6 +16,7 @@ window.SITE = {
   address: "1051 Budapest, Példa utca 12.",
   social: { facebook: "", instagram: "" },
   reviewUrl: "",                      // Google "értékelés írása" link (Google Cégprofil > Értékelések kérése)
+  googleReviews: false,           // true = élő Google-vélemények (a Worker tölti és 12 óránként frissíti; kell hozzá: tenants.place_id + GOOGLE_KEY, lásd README)
   rating: { score: 4.9, count: 120 }, // csak valós adat! Üres = nem jelenik meg
 
   // Hétfő..Vasárnap; null = zárva
@@ -50,8 +51,15 @@ window.SITE = {
     { q: "Van parkolás?", a: "A szalon előtt fizetős parkolózóna van, a sarkon pedig mélygarázs." },
     { q: "Hogyan tudom lemondani az időpontot?", a: "A foglalás után kapott kóddal a chatben, vagy telefonon, legalább 24 órával korábban." },
     { q: "Kisgyereket is vágtok?", a: "Természetesen, gyerekeknek 3 000 Ft a hajvágás." },
+    { q: "Be kell jelentkezni előre, vagy be lehet térni?", a: "Előzetes időpontfoglalással tudunk garantáltan fogadni, de ha éppen van szabad hely, betérőt is szívesen látunk." },
+    { q: "Allergiás vagyok, milyen termékeket használtok?", a: "Kíméletes, szakmai termékekkel dolgozunk. Allergia esetén szóljon előre, és hipoallergén alternatívát választunk." },
+    { q: "Kaphatok ajándékutalványt?", a: "Igen, ajándékutalványt bármilyen összegre vagy szolgáltatásra készítünk." },
+    { q: "Mi van, ha késni fogok?", a: "15 percet tudunk várni; ennél nagyobb késésnél sajnos új időpontot kell egyeztetnünk." },
+    { q: "Beszéltek angolul?", a: "Igen, angolul is szívesen segítünk." },
+    { q: "Lehet számlát kérni?", a: "Természetesen, kérésre céges számlát is kiállítunk." },
   ],
 
+  syn: [],           // a bot saját szinonimái, pl. [["hajvagas", "nyiras"]] (a gyakori szavakat ismeri)
   step: 30,          // időpontok lépésköze percben
   notice: 60,        // legkorábban ennyi perc múlva foglalható
   days: 30,          // ennyi napra előre foglalható
@@ -59,4 +67,5 @@ window.SITE = {
   analytics: "",     // Cloudflare Web Analytics token (sütimentes, ingyenes)
   api: "",           // a Worker címe, pl. https://kisweb-api.valami.workers.dev ; üres = WhatsApp-üzenet
   turnstile: "",     // Cloudflare Turnstile site key (spam ellen; a titkos párja a Workerben van). Teszt: 1x00000000000000000000AA
+  botDelay: [1000, 4000],  // a chatbot "gépelési" ideje ms-ban [legrövidebb, leghosszabb]
 };

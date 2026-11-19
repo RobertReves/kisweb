@@ -16,8 +16,9 @@ const wrap = sql => { const mk = a => { const s = db.prepare(sql); return {
 const env = { DB: { prepare: wrap }, TG_TOKEN: "t" };
 db.prepare("INSERT INTO tenants(slug,origin,token_hash,tg_chat) VALUES('a','https://a.hu',?,'1'),('b','https://b.hu',?,'')").run(sha("tokA"), sha("tokB"));
 
-const sent = []; // Telegram + Turnstile hívások elfogása
+const places = [], sent = []; // Telegram + Turnstile hívások elfogása
 globalThis.fetch = async (url, init) => {
+  if (String(url).includes("places.googleapis.com")) { places.push([String(url), init.headers["X-Goog-Api-Key"]]); return places.fail ? new Response("{}", { status: 500 }) : Response.json({ rating: 4.86, userRatingCount: 123, reviews: [{ rating: 5, text: { text: "Szuper <b>hely</b>" }, authorAttribution: { displayName: "Kata" }, relativePublishTimeDescription: "2 hete" }, { rating: 4, text: { text: "" }, authorAttribution: { displayName: "Üres" } }] }); }
   if (String(url).includes("siteverify")) return Response.json({ success: init.body.get("response") === "good" });
   sent.push(JSON.parse(init.body).text); return Response.json({ ok: true });
 };
@@ -104,6 +105,25 @@ assert.equal((await call("/msg", { text: "Szia", contact: "x", ts: "rossz" })).s
 assert.equal((await call("/book", { ...bk({ start: 1200, date: new Date(Date.now() + 5 * 864e5).toISOString().slice(0, 10), phone: "06 31 555 0000" }), ts: "good" })).s, 200, "érvényes token");
 assert.equal((await call("/admin/book", bk({ start: 1380, phone: "" }), { auth: "tokA" })).s, 200, "admin Turnstile nélkül");
 delete env.TURNSTILE_SECRET;
+
+/* --- Google-vélemények --- */
+assert.deepEqual((await call("/reviews")).d, {}, "place_id és kulcs nélkül üres");
+db.prepare("UPDATE tenants SET place_id='ChIJ_x' WHERE slug='a'").run();
+assert.deepEqual((await call("/reviews")).d, {}, "kulcs nélkül üres");
+env.GOOGLE_KEY = "k";
+r = await call("/reviews"); assert.equal(r.d.score, 4.9); assert.equal(r.d.count, 123);
+assert.equal(r.d.list.length, 1, "szöveg nélküli vélemény kimarad"); assert.equal(r.d.list[0].who, "Kata"); assert.equal(r.d.list[0].stars, 5);
+assert.match(r.d.write, /writereview\?placeid=ChIJ_x$/);
+assert.equal(places.length, 1); assert.ok(places[0][0].includes("/places/ChIJ_x") && places[0][1] === "k", "a kulcs csak a Google felé megy");
+await call("/reviews"); assert.equal(places.length, 1, "12 óráig gyorsítótárból");
+assert.equal((await call("/reviews", null, { origin: "https://evil.hu" })).s, 403, "idegen origin");
+db.prepare("UPDATE tenants SET reviews_at=? WHERE slug='a'").run(Date.now() - 13 * 3600e3); places.fail = true;
+r = await call("/reviews"); assert.equal(r.d.count, 123, "Google-hiba: a régi adat marad"); assert.equal(places.length, 2);
+await call("/reviews"); assert.equal(places.length, 2, "hiba után 1 percig nem próbálkozik újra");
+db.prepare("UPDATE tenants SET reviews_at=? WHERE slug='a'").run(Date.now() - 13 * 3600e3); places.fail = false;
+await call("/reviews"); assert.equal(places.length, 3, "lejárt gyorsítótár frissül");
+assert.deepEqual((await call("/reviews", null, { site: "b", origin: "https://b.hu" })).d, {}, "másik ügyfélnek nincs");
+delete env.GOOGLE_KEY;
 
 await w.scheduled({}, env);
 assert.equal(db.prepare("SELECT COUNT(*) n FROM hits WHERE exp < ?").get(Math.floor(Date.now() / 1000)).n, 0, "lejárt számlálók törlődnek");
