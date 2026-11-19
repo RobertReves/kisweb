@@ -56,7 +56,8 @@ $("#year").textContent = new Date().getFullYear();
 $("#foot").textContent = C.name;
 // üres szekciók elrejtése
 for (const s of document.querySelectorAll("[data-has]")) if (!(s.dataset.has === "reviews" && live) && (!C[s.dataset.has]?.length || (s.dataset.has === "staff" && !$("#staff").innerHTML))) s.remove();
-if (!(API && canBook)) $("#naptar").remove(); // a naptár a foglalási szerver adataiból él
+const sim = !API && (C.demo || new URLSearchParams(location.search).has("demo")); // bemutató: szerver nélkül kitalált foglaltság
+if (!((API || sim) && canBook)) $("#naptar").remove(); // éles oldalon a naptár a foglalási szerver adataiból él
 if (!(C.perks || []).length) $("#perks").remove();
 document.querySelectorAll(".links a").forEach(l => { if (!document.querySelector(l.getAttribute("href"))) l.remove(); }); // nincs ilyen szekció -> nincs menüpont
 
@@ -219,6 +220,14 @@ function showContact() { say(Z.contact()); ctx.draft ? back() : offer([["Útvona
 
 /* --- foglalás --- */
 async function loadBusy() {
+  if (sim) { // bemutató-adat: napról napra változó, determinisztikus "foglalások"; minden 9. nap teljesen betelt
+    busy = [];
+    for (let i = 0; i < (C.days || 30); i++) for (const s of staff) for (let j = 0; j < 4; j++) {
+      const k = ymd(new Date(Date.now() + i * 864e5)), n = i * 5 + j * 3 + s.name.length * 7;
+      busy.push(i % 9 === 4 ? [k, 0, 1440, s.name] : [k, 540 + n % 16 * 30, 30 * (1 + n % 3), s.name]);
+    }
+    return busy;
+  }
   if (!API) return busy = [];
   const from = ymd(new Date()), to = ymd(new Date(Date.now() + (C.days || 30) * 864e5));
   try { busy = (await call(`/busy?from=${from}&to=${to}`)).data.busy || []; } catch { busy = []; }

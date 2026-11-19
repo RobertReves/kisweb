@@ -36,6 +36,7 @@ jobs:
       - name: Demó előkészítése (kereső ne indexelje, helykitöltők kitöltése)
         run: |
           cp -r template _site
+          echo 'window.SITE.demo = true;' >> _site/config.js # bemutató: a naptár kitalált foglaltsággal látszik
           URL="${{ steps.pages.outputs.base_url }}"
           for f in _site/index.html _site/robots.txt _site/sitemap.xml; do
             sed -i "s|__NAME__|Szalon Éva (demó)|g; s|__DESC__|Bemutató oldal|g; s|__URL__|$URL|g" "$f"

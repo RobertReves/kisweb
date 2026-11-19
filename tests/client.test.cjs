@@ -18,6 +18,7 @@ async function load({ api = "", turnstile = "", reduced = true, config = "config
   w.open = u => calls.push(["open", u]);
   w.requestAnimationFrame = cb => setTimeout(() => cb(w.performance.now()), 16);
   w.IntersectionObserver = class { constructor(cb) { this.cb = cb; } observe(el) { this.cb([{ isIntersecting: true, target: el }]); } unobserve() {} };
+  { const D = w.Date, off = Date.parse(process.env.NOW || "2026-11-18T10:00:00") - Date.now(); w.Date = class extends D { constructor(...a) { a.length ? super(...a) : super(D.now() + off); } static now() { return D.now() + off; } }; } // rögzített "ma": szerda 10:00 (különben a teszt a hét napjától és napszaktól függne); másik nap: NOW=2026-11-19T23:46:00
   w.eval(fs.readFileSync(R + config, "utf8"));
   Object.assign(w.SITE, { api, turnstile, ...(delay && { botDelay: delay }), ...(google && { googleReviews: true }) }); tweak?.(w.SITE);
   w.fetch = async (url, init = {}) => {
@@ -201,6 +202,8 @@ async function load({ api = "", turnstile = "", reduced = true, config = "config
   assert.ok(![...t.d.querySelectorAll("#calday button.slot")].some(x => x.textContent === t0txt)); assert.ok(!JSON.stringify(t.calls).includes("Teszt"), "személyes adat nincs");
   t.$("#calnext").click(); assert.ok(t.$("#calmon").textContent.length > 4, "hónapváltás");
   t = await load(); assert.ok(!t.$("#naptar") && !t.d.querySelector(".links a[href='#naptar']"), "API nélkül nincs naptár (nincs adat)");
+  t = await load({ tweak: c => c.demo = true }); await t.flush(); assert.ok(t.$("#naptar") && !t.calls.some(c => c[0] === "/busy"), "bemutatón szerver nélkül is van naptár, kitalált adattal");
+  assert.ok(t.d.querySelectorAll("#cal .d.free").length >= 3 && t.d.querySelectorAll("#cal .d.full").length >= 1 && t.d.querySelectorAll("#calday .slot").length >= 4, "szabad és betelt napok is vannak");
   t = await load({ api: "https://api.test", config: "examples/bolt.config.js" }); assert.ok(!t.$("#naptar"), "foglalás nélküli boltnál nincs naptár");
 
   // 4c) élő Google-vélemények
