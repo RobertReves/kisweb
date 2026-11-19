@@ -1,0 +1,8 @@
+node_modules/
+# ügyfél-mappák (valós telefonszámok, címek): saját, külön repóba kerülnek, ide nem
+customers/
+# titkok soha nem kerülnek a repóba
+.dev.vars
+.wrangler/
+*.pem
+.env*

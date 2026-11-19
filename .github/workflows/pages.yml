@@ -1,0 +1,49 @@
+# Minden push a main-re: tesztek, majd a template/ mappa kikerül a demó oldalra (GitHub Pages).
+name: Demó oldal
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node --no-warnings tests/worker.test.mjs
+      - run: cd tests && npm ci && node client.test.cjs
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+        id: pages
+      - name: Demó előkészítése (kereső ne indexelje, helykitöltők kitöltése)
+        run: |
+          cp -r template _site
+          URL="${{ steps.pages.outputs.base_url }}"
+          for f in _site/index.html _site/robots.txt _site/sitemap.xml; do
+            sed -i "s|__NAME__|Szalon Éva (demó)|g; s|__DESC__|Bemutató oldal|g; s|__URL__|$URL|g" "$f"
+          done
+          sed -i 's|<!--CSP-->|<meta name="robots" content="noindex,nofollow">|' _site/index.html
+          printf 'User-agent: *\nDisallow: /\n' > _site/robots.txt
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

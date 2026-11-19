@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<!--CSP-->
+<title>__NAME__</title>
+<meta name="description" content="__DESC__">
+<meta property="og:title" content="__NAME__">
+<meta property="og:description" content="__DESC__">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="hu_HU">
+<link rel="canonical" href="__URL__/">
+<meta name="theme-color" content="#b8860b">
+<link rel="stylesheet" href="core/style.css">
+<script src="config.js"></script>
+</head>
+<body>
+<div id="prog" aria-hidden="true"></div>
+<div id="banner" hidden></div>
+<header class="top">
+  <b id="brand"></b>
+  <nav class="links"><a href="#szolgaltatasok">Szolgáltatások</a><a href="#velemenyek">Vélemények</a><a href="#kapcsolat">Kapcsolat</a></nav>
+  <span id="openbadge" class="badge"></span>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="blobs" aria-hidden="true"><i></i><i></i></div>
+    <p id="rating" class="pill" hidden></p>
+    <h1 id="h1"></h1>
+    <p id="tag" class="lead"></p>
+    <div class="cta">
+      <button class="btn" id="mainbtn"></button>
+      <a class="btn ghost" id="callbtn">Hívás</a>
+    </div>
+  </section>
+
+  <section id="perks" class="grid3 rv"></section>
+
+  <section id="szolgaltatasok" class="rv" data-has="services">
+    <h2>Szolgáltatások és árak</h2>
+    <ul id="services" class="list"></ul>
+  </section>
+
+  <section class="rv" data-has="products">
+    <h2>Termékeink</h2>
+    <div id="products" class="cards"></div>
+  </section>
+
+  <section class="rv" data-has="staff">
+    <h2>Csapatunk</h2>
+    <div id="staff" class="cards team"></div>
+  </section>
+
+  <section class="rv" data-has="gallery">
+    <h2>Galéria</h2>
+    <div id="gallery" class="gallery"></div>
+  </section>
+
+  <section id="velemenyek" class="rv" data-has="reviews">
+    <h2>Vendégeink mondták</h2>
+    <div id="reviews" class="cards"></div>
+    <p><a id="reviewlink" class="btn ghost" target="_blank" rel="noopener" hidden>Írjon értékelést a Google-on</a></p>
+  </section>
+
+  <section class="rv">
+    <h2>Nyitvatartás</h2>
+    <ul id="hours" class="list"></ul>
+  </section>
+
+  <section class="rv" data-has="faq">
+    <h2>Gyakori kérdések</h2>
+    <div id="faq"></div>
+  </section>
+
+  <section id="kapcsolat" class="rv">
+    <h2>Elérhetőség</h2>
+    <p id="contact"></p>
+    <p><a id="dir" class="btn ghost" target="_blank" rel="noopener">Útvonaltervezés</a></p>
+    <iframe id="map" loading="lazy" title="Térkép" referrerpolicy="no-referrer"></iframe>
+  </section>
+</main>
+
+<footer>
+  <div id="social"></div>
+  © <span id="year"></span> <span id="foot"></span> · <a href="adatvedelem.html">Adatkezelés</a> · Sütiket nem használunk, a látogatókat nem követjük.
+</footer>
+
+<nav class="bar">
+  <a id="barcall">Hívás</a>
+  <button id="barmain"></button>
+  <button data-bot="chat" aria-label="Chat megnyitása">💬</button>
+</nav>
+
+<dialog id="lb"><img alt=""><form method="dialog"><button aria-label="Bezár">✕</button></form></dialog>
+
+<button id="botfab" aria-label="Chat megnyitása">💬</button>
+<aside id="bot" hidden role="dialog" aria-label="Asszisztens">
+  <div class="bh"><b>Asszisztens</b><button id="botx" aria-label="Bezár">✕</button></div>
+  <div id="msgs" aria-live="polite"></div>
+  <div id="chips"></div>
+  <div id="ts"></div>
+  <form id="botform"><input id="botin" placeholder="Írjon ide…" autocomplete="off" maxlength="300" enterkeyhint="send"><button aria-label="Küldés">➤</button></form>
+  <small class="pv">Adatait csak az ügyintézéshez használjuk · <a href="adatvedelem.html">Adatkezelés</a></small>
+</aside>
+
+<script src="core/app.js"></script>
+</body>
+</html>

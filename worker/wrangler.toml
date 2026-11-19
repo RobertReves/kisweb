@@ -1,0 +1,15 @@
+name = "kisweb-api"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "kisweb"
+database_id = "IDE-JON-A-wrangler-d1-create-AZONOSITO"
+
+[triggers]
+crons = ["0 5 * * *"]   # reggeli összefoglaló + régi foglalások törlése (05:00 UTC = 6-7 óra Budapest)
+
+# Telegram bot token: wrangler secret put TG_TOKEN
+# Turnstile (ingyenes, dash.cloudflare.com > Turnstile > Add site): wrangler secret put TURNSTILE_SECRET
+# A site key-t az ugyfel config.js-enek "turnstile" mezojebe kell irni. Titok nelkul az ellenorzes ki van kapcsolva (csak fejleszteshez!).

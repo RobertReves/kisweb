@@ -1,0 +1,3 @@
+User-agent: *
+Disallow: /admin.html
+Sitemap: __URL__/sitemap.xml

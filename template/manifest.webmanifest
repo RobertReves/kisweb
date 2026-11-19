@@ -1,0 +1,10 @@
+{
+  "name": "__NAME__ – foglalások",
+  "short_name": "Foglalások",
+  "start_url": "./admin.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#faf8f5",
+  "theme_color": "__ACCENT__",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
