@@ -10,7 +10,7 @@ const norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 const tel = C.phone.replace(/[^\d+]/g, "");
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const wait = ms => new Promise(r => setTimeout(r, ms));
-const calm = matchMedia("(prefers-reduced-motion:reduce)").matches; // csökkentett mozgás kérése esetén nincs animáció
+const calm = matchMedia("(prefers-reduced-motion:reduce)").matches; // csökkentett mozgás kérése esetén nincsenek díszítő animációk (a bot válaszideje és gépelése nem animáció, az marad)
 const touch = matchMedia("(hover:none)").matches;
 const staff = C.staff?.length ? C.staff : [{ name: "" }];
 const canBook = C.booking !== false && C.services?.length;
@@ -31,11 +31,11 @@ $("#brand").textContent = C.name;
 // a főcím szavanként animálva jelenik meg
 $("#h1").replaceChildren(...C.name.split(" ").flatMap((w, i, a) => { const s = document.createElement("span"); s.className = "w"; s.style.setProperty("--i", i); s.textContent = w; return i < a.length - 1 ? [s, " "] : [s]; }));
 $("#tag").textContent = C.tagline;
-$("#callbtn").href = $("#barcall").href = "tel:" + tel;
+$("#callbtn").href = "tel:" + tel;
 $("#callbtn").textContent = "Hívás: " + C.phone;
 const mainLabel = canBook ? "Időpontfoglalás" : "Kérdezzen tőlünk";
 const mainAct = canBook ? "book" : "msg";
-for (const b of [$("#mainbtn"), $("#barmain")]) { b.textContent = mainLabel; b.dataset.bot = mainAct; }
+{ const b = $("#mainbtn"); b.textContent = mainLabel; b.dataset.bot = mainAct; }
 if (C.rating) { const r = $("#rating"); r.hidden = false; r.textContent = `★ ${C.rating.score} · ${C.rating.count} értékelés`; }
 $("#perks").innerHTML = (C.perks || []).map((p, i) => `<div class="card"><span class="num">0${i + 1}</span><b>${esc(p.t)}</b><p>${esc(p.d)}</p></div>`).join("");
 $("#services").innerHTML = (C.services || []).map(s => `<li><span>${esc(s.name)}<small>${s.min} perc</small></span><b>${esc(s.price)}</b></li>`).join("");
@@ -66,7 +66,7 @@ document.addEventListener("click", e => {
   const g = e.target.closest("[data-src]"); if (!g) return;
   $("#lb img").src = g.dataset.src; $("#lb").showModal();
 });
-$("#lb").onclick = e => e.target === $("#lb") && $("#lb").close();
+$("#lb").addEventListener("click", e => { if (e.target === $("#lb")) $("#lb").close(); }); // addEventListener: az onclick "false" visszatérése letiltaná a ✕ gomb alapműveletét
 
 /* ---------- animációk ---------- */
 if (!calm && "IntersectionObserver" in window) {
@@ -181,15 +181,26 @@ const scroll = (el = msgs.lastElementChild) => msgs.scrollTo({ top: el && el.off
 
 const bubble = (t, who) => { const d = document.createElement("div"); d.className = "m " + who; d.textContent = t; msgs.append(d); scroll(d); return d; };
 const user = t => bubble(t, "me");
-// a bot "gépel": hárompontos jelzés 1–4 mp-ig (a válasz hosszával nő, kis véletlennel), aztán egyben jelenik meg; csökkentett mozgásnál azonnal
+// a bot válasza: hárompontos jelzés, majd betűnként "legépeli" a szöveget. Az egész 1–4 mp (a válasz hosszával nő, kis véletlennel); [0, 0] = azonnal.
+// A gépelés csökkentett mozgás beállításnál is megy (az a mozgó díszítést kapcsolja ki, a jelzés ilyenkor áll).
 const [dMin, dMax] = C.botDelay || [1000, 4000];
 const pace = t => Math.min(dMax, Math.max(dMin, dMin + t.length * 12 + Math.random() * 400));
+// a buborék már a teljes méretében ott van (a még nem leírt rész láthatatlan), így nem ugrál az elrendezés és a görgetés egyszer igazodik
+const typeMs = (t, total) => Math.min(1600, [...t].length * 24, total * .6);
+async function typeOut(t, total) {
+  const d = document.createElement("div"); d.className = "m bot";
+  const shown = document.createTextNode(""), rest = document.createElement("span"); rest.style.visibility = "hidden"; rest.textContent = t;
+  d.append(shown, rest); msgs.append(d); scroll(d);
+  const ch = [...t], dur = typeMs(t, total), step = 30, per = Math.max(1, Math.ceil(ch.length / Math.max(1, dur / step)));
+  for (let i = per; i < ch.length + per; i += per) { await wait(step); const n = Math.min(i, ch.length); shown.data = ch.slice(0, n).join(""); rest.textContent = ch.slice(n).join(""); }
+  d.textContent = t; // a végén egyetlen, tiszta szöveg
+}
 let pend = 0; // függő bot-üzenetek: amíg gépel, a régi gombok nem nyomhatók (különben elavult kérdésre válaszolna a vendég)
 const say = t => { ctx.lastBot = t; pend++; chips.inert = true; q = q.then(async () => {
   try {
-    if (calm) return bubble(t, "bot");
-    const ty = document.createElement("div"); ty.className = "m bot typing"; ty.setAttribute("aria-label", "Az asszisztens ír…"); ty.innerHTML = "<i></i><i></i><i></i>"; msgs.append(ty); scroll(ty);
-    await wait(pace(t)); ty.remove(); bubble(t, "bot");
+    if (!dMax) return bubble(t, "bot");
+    const total = pace(t), ty = document.createElement("div"); ty.className = "m bot typing"; ty.setAttribute("aria-label", "Az asszisztens ír…"); ty.innerHTML = "<i></i><i></i><i></i>"; msgs.append(ty); scroll(ty);
+    await wait(total - typeMs(t, total)); ty.remove(); await typeOut(t, total);
   } finally { if (!--pend) chips.inert = false; }
 }); return q; };
 const offer = list => { q = q.then(() => {
@@ -376,17 +387,18 @@ async function doCancel(id) {
   home();
 }
 
-/* --- nyilvános naptár: csak olvasható; szabad időpontra kattintva a chat foglalást indít előtöltve --- */
+/* --- nyilvános naptár: csak olvasható; egy napra kattintva felugró ablak: szabad időpontok (kattintásra a chat foglalást indít előtöltve) vagy "betelt" --- */
 if ($("#naptar")) {
-  const minDur = Math.min(...C.services.map(s => s.min)), horizon = new Date(Date.now() + (C.days || 30) * 864e5);
+  const minDur = Math.min(...C.services.map(s => s.min)), horizon = new Date(Date.now() + (C.days || 30) * 864e5), dlg = $("#dayd");
   const first = ymd(new Date()).slice(0, 7), last = ymd(horizon).slice(0, 7), dayLabel = d => d.toLocaleDateString("hu-HU", { weekday: "long", month: "long", day: "numeric" });
-  let mon = first, sel = null;
+  let mon = first, sel = null, jumped = false;
   const monthOf = (ym, n) => ymd(new Date(+ym.slice(0, 4), +ym.slice(5) - 1 + n, 1, 12)).slice(0, 7);
   const drawCal = () => {
     const [y, m] = mon.split("-").map(Number), lead = dow(new Date(y, m - 1, 1, 12)), n = new Date(y, m, 0).getDate(), today = ymd(new Date()), end = ymd(horizon);
-    if (!sel) { // alapból az első szabad nap van kijelölve
-      for (let i = 0; i < (C.days || 30) && !sel; i++) { const d = new Date(Date.now() + i * 864e5); if (freeSlots(d, minDur, "").length) sel = ymd(d); }
-      sel ??= today; mon = sel.slice(0, 7); return drawCal();
+    if (!jumped) { // induláskor arra a hónapra ugrik, ahol az első szabad nap van (egyébként a mostanira)
+      jumped = true;
+      for (let i = 0; i < (C.days || 30); i++) { const d = new Date(Date.now() + i * 864e5); if (freeSlots(d, minDur, "").length) { mon = ymd(d).slice(0, 7); break; } }
+      return drawCal();
     }
     $("#calmon").textContent = new Date(y, m - 1, 1, 12).toLocaleDateString("hu-HU", { year: "numeric", month: "long" });
     $("#calprev").disabled = mon <= first; $("#calnext").disabled = mon >= last;
@@ -396,27 +408,30 @@ if ($("#naptar")) {
       if (!d) { b.className = "d o"; b.disabled = true; b.tabIndex = -1; b.setAttribute("aria-hidden", "true"); return b; }
       const k = ymd(d), inRange = k >= today && k <= end, free = inRange && freeSlots(d, minDur, "").length > 0;
       b.className = ["d", !inRange && "o", inRange && !free && "full", free && "free", k === today && "tod", k === sel && "sel"].filter(Boolean).join(" ");
-      b.disabled = !inRange; b.dataset.d = k; b.setAttribute("aria-pressed", String(k === sel));
+      b.disabled = !inRange; b.dataset.d = k; b.setAttribute("aria-haspopup", "dialog");
       b.setAttribute("aria-label", dayLabel(d) + (!inRange ? "" : free ? ", van szabad időpont" : closed.has(k) ? ", zárva" : ", betelt"));
       b.append(Object.assign(document.createElement("span"), { textContent: d.getDate() }), document.createElement("i"));
-      b.onclick = () => { sel = k; drawCal(); };
+      b.onclick = () => { sel = k; drawCal(); drawDay(); if (!dlg.open) dlg.showModal(); };
       return b;
     }));
-    drawDay();
   };
   const drawDay = () => {
-    const box = $("#calday"), d = new Date(sel + "T12:00:00");
-    const slots = closed.has(sel) ? [] : freeSlots(d, minDur, "", true), h = Object.assign(document.createElement("b"), { textContent: dayLabel(d) });
-    if (!slots.length) return box.replaceChildren(h, Object.assign(document.createElement("p"), { className: "muted", textContent: closed.has(sel) || !C.hours[dow(d)] ? "Ezen a napon zárva vagyunk." : "Erre a napra nincs szabad időpont." }));
-    const wrap = Object.assign(document.createElement("div"), { className: "slots" });
+    const box = $("#calday"), d = new Date(sel + "T12:00:00"), el = (tag, o) => Object.assign(document.createElement(tag), o);
+    const slots = closed.has(sel) ? [] : freeSlots(d, minDur, "", true), h = el("h3", { textContent: dayLabel(d) });
+    const free = slots.filter(([, who]) => who !== null);
+    if (!free.length) return box.replaceChildren(h, el("p", { className: "full-msg", textContent: closed.has(sel) || !C.hours[dow(d)] ? "Ezen a napon zárva vagyunk." : "Erre a napra már minden időpont betelt." }), el("p", { className: "muted small", textContent: "Válasszon egy másik, zölddel jelölt napot." }));
+    const wrap = el("div", { className: "slots" });
     wrap.append(...slots.map(([t, who]) => who === null
-      ? Object.assign(document.createElement("span"), { className: "slot x", textContent: hhmm(t), title: "Foglalt" })
-      : Object.assign(document.createElement("button"), { className: "slot", textContent: hhmm(t), onclick: () => openBot("book", { date: sel, at: t, who: "" }) })));
-    box.replaceChildren(h, Object.assign(document.createElement("p"), { className: "muted small", textContent: "Kattintson egy szabad időpontra, és a chatben néhány lépésben kérheti." }), wrap);
+      ? el("span", { className: "slot x", textContent: hhmm(t), title: "Foglalt" })
+      : el("button", { className: "slot", type: "button", textContent: hhmm(t), onclick: () => { const day = sel; dlg.close(); openBot("book", { date: day, at: t, who: "" }); } })));
+    box.replaceChildren(h, el("p", { className: "muted small", textContent: `Szabad időpontok (${free.length}). Válasszon egyet, és a chatben néhány lépésben lefoglalhatja.` }), wrap,
+      el("button", { className: "btn sm", type: "button", textContent: "Időpontot foglalok erre a napra", onclick: () => { const day = sel; dlg.close(); openBot("book", { date: day, who: "" }); } }));
   };
+  dlg.addEventListener("click", e => { if (e.target === dlg) dlg.close(); }); // a háttérre kattintva bezárul
+  dlg.addEventListener("close", () => { sel = null; drawCal(); });
   $("#calprev").onclick = () => { mon = monthOf(mon, -1); drawCal(); };
   $("#calnext").onclick = () => { mon = monthOf(mon, 1); drawCal(); };
-  const reload = () => loadBusy().then(() => { calRedraw = drawCal; drawCal(); }); // az első rajzolás a foglaltsági adat megérkezése után
+  const reload = () => loadBusy().then(() => { calRedraw = () => { drawCal(); if (dlg.open) drawDay(); }; calRedraw(); }); // az első rajzolás a foglaltsági adat megérkezése után; a nyitott ablak is frissül
   reload();
   setInterval(() => { if (!document.hidden) reload(); }, 60000); // a frissen foglalt időpontok maguktól eltűnnek
 }
@@ -534,7 +549,7 @@ function openBot(go, arg) {
   panel.hidden = false; $("#botfab").hidden = true;
   if (phone.matches) { lock(true); fit(); }
   if (!started) { started = true; say(Z.welcome()); home(); }
-  if (go === "book") { user(arg?.at != null ? `Időpontot kérek: ${arg.date} ${hhmm(arg.at)}` : "Időpontot foglalok"); chips.replaceChildren(); book(arg); }
+  if (go === "book") { user(arg?.at != null ? `Időpontot kérek: ${arg.date} ${hhmm(arg.at)}` : arg?.date ? `Időpontot kérek: ${arg.date}` : "Időpontot foglalok"); chips.replaceChildren(); book(arg); }
   if (go === "msg") { user("Üzenetet hagyok"); chips.replaceChildren(); msg(arg); }
   if (!phone.matches) $("#botin").focus({ preventScroll: true }); // telefonon ne ugorjon fel a billentyűzet magától
 }

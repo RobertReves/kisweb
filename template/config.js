@@ -67,5 +67,5 @@ window.SITE = {
   analytics: "",     // Cloudflare Web Analytics token (sütimentes, ingyenes)
   api: "",           // a Worker címe, pl. https://kisweb-api.valami.workers.dev ; üres = WhatsApp-üzenet
   turnstile: "",     // Cloudflare Turnstile site key (spam ellen; a titkos párja a Workerben van). Teszt: 1x00000000000000000000AA
-  botDelay: [1000, 4000],  // a chatbot "gépelési" ideje ms-ban [legrövidebb, leghosszabb]
+  botDelay: [1000, 4000],  // a chatbot válaszideje ms-ban [legrövidebb, leghosszabb]: hárompontos jelzés, majd betűnként megjelenő szöveg; [0, 0] = azonnali válasz
 };

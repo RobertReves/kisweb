@@ -67,7 +67,8 @@ Helyi megtekintés: `cd template`, `python -m http.server 8080`, http://localhos
 - **app.js – végrehajtja és emlékszik**: futó foglalás módosítása, kérdés után visszatér a foglaláshoz, megjegyzi a nevet/telefont (csak a lap életében), legkorábbi szabad időpont, szavankénti "gépelés".
 - A tudását a `config.js`-ből veszi: `faq`, `products`, `perks`, `services`, `staff`. Minél több GYIK-kérdés, annál okosabb a bot.
 - Saját szinonimák (opcionális): `syn: [["hajvagas", "nyiras"]]` a configban.
-- **Gépelés**: a bot minden üzenete előtt hárompontos jelzés látszik 1–4 mp-ig (a válasz hosszától függ; `botDelay: [1000, 4000]` a configban); gépelés közben a régi gombok le vannak tiltva. Csökkentett mozgásnál azonnal válaszol.
+- **Gépelés**: a bot minden üzenete előtt hárompontos jelzés látszik, majd a szöveg betűnként "legépelődik"; az egész 1–4 mp (a válasz hosszától függ; `botDelay: [1000, 4000]` a configban, `[0, 0]` = azonnali). Gépelés közben a régi gombok le vannak tiltva. A "csökkentett mozgás" beállítás csak a díszítő animációkat kapcsolja ki (a jelzés ilyenkor áll), a válaszidő és a gépelés marad.
+- **Naptár**: egy napra kattintva felugró ablak jön: szabad időpontok (kattintásra a chat előtöltve indítja a foglalást) vagy "betelt". Telefonon nincs alsó Hívás/Időpont sáv, csak a 💬 gomb.
 - **Telefon**: a chat alatt a háttéroldal rögzítve van (bezáráskor ugyanoda áll vissza), a panel követi a billentyűzet miatt összement látható területet, a hosszú válasz elejére görget.
 - **Nyilvános naptár** (`#naptar`, csak `api` + foglalás esetén): a vendég a szabad/betelt napokat és a napi időpontokat látja (személyes adat nélkül, percenként frissül); szabad időpontra kattintva a chat az előtöltött nappal és idővel indítja a foglalást.
 - Admin (`admin.html`): havi naptár a foglalások számával, a kijelölt nap idővonala munkatársanként, lista a hívás/emlékeztető/törlés gombokkal.

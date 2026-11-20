@@ -9,7 +9,8 @@ async function load({ api = "", turnstile = "", reduced = true, config = "config
   const errs = [], vc = new (require("jsdom").VirtualConsole)(); vc.on("jsdomError", e => errs.push(e));
   const dom = new JSDOM(html, { runScripts: "outside-only", url: "https://szalon-eva.hu/", virtualConsole: vc });
   const w = dom.window, calls = [];
-  w.HTMLDialogElement.prototype.showModal = () => {};
+  w.HTMLDialogElement.prototype.showModal = function () { this.setAttribute("open", ""); };
+  w.HTMLDialogElement.prototype.close = function () { if (this.hasAttribute("open")) { this.removeAttribute("open"); this.dispatchEvent(new w.Event("close")); } };
   w.Element.prototype.scrollTo = () => {};
   w.matchMedia = q => ({ matches: /reduce/.test(q) ? reduced : /max-width/.test(q) ? phone : false, addEventListener() {} });
   w.scrollTo = o => calls.push(["scrollTo", o]);
@@ -20,7 +21,7 @@ async function load({ api = "", turnstile = "", reduced = true, config = "config
   w.IntersectionObserver = class { constructor(cb) { this.cb = cb; } observe(el) { this.cb([{ isIntersecting: true, target: el }]); } unobserve() {} };
   { const D = w.Date, off = Date.parse(process.env.NOW || "2026-11-18T10:00:00") - Date.now(); w.Date = class extends D { constructor(...a) { a.length ? super(...a) : super(D.now() + off); } static now() { return D.now() + off; } }; } // rögzített "ma": szerda 10:00 (különben a teszt a hét napjától és napszaktól függne); másik nap: NOW=2026-11-19T23:46:00
   w.eval(fs.readFileSync(R + config, "utf8"));
-  Object.assign(w.SITE, { api, turnstile, ...(delay && { botDelay: delay }), ...(google && { googleReviews: true }) }); tweak?.(w.SITE);
+  Object.assign(w.SITE, { api, turnstile, botDelay: delay || [0, 0], ...(google && { googleReviews: true }) }); tweak?.(w.SITE);
   w.fetch = async (url, init = {}) => {
     const u = new URL(url), body = init.body && JSON.parse(init.body); calls.push([u.pathname, body]);
     const ok = (d, status = 200) => ({ status, json: async () => d });
@@ -119,21 +120,32 @@ async function load({ api = "", turnstile = "", reduced = true, config = "config
   await t.type("be lehet menni időpont nélkül?"); assert.match(t.last(), /betérőt/, "nélkül: nem foglalás, hanem a GYIK");
 
   // 1d) "gépelés": előbb a hárompontos jelzés (a válasz még nincs ott), a késleltetés után egyben jelenik meg
-  t = await load({ reduced: false, delay: [300, 300] }); t.$("#botfab").click(); await new Promise(r => setTimeout(r, 600));
+  t = await load({ reduced: false, delay: [600, 600] }); t.$("#botfab").click(); await new Promise(r => setTimeout(r, 1000));
   t.$("#botin").value = "van parkolás?"; t.$("#botform").dispatchEvent(new t.w.Event("submit", { cancelable: true }));
   await new Promise(r => setTimeout(r, 150));
   assert.ok(t.d.querySelector(".m.bot.typing"), "a jelzés látszik"); assert.equal(t.d.querySelector(".typing").children.length, 3, "három pont");
   assert.ok(![...t.d.querySelectorAll(".m.bot:not(.typing)")].some(m => /parkol/.test(m.textContent)), "a válasz a késleltetés alatt még nincs ott");
-  await new Promise(r => setTimeout(r, 500)); assert.match(t.last(), /A szalon előtt fizetős parkolózóna van/, "a teljes válasz egyben megjelenik"); assert.ok(!t.d.querySelector(".typing"), "a jelzés eltűnik");
+  await new Promise(r => setTimeout(r, 700)); assert.match(t.last(), /A szalon előtt fizetős parkolózóna van/, "a teljes válasz megjelenik"); assert.ok(!t.d.querySelector(".typing"), "a jelzés eltűnik");
+
+  // 1d-1) írógép-hatás: a jelzés után a szöveg fokozatosan, betűnként jelenik meg (a buborék kezdettől teljes méretű); csökkentett mozgásnál (reduced: true) is
+  for (const reduced of [false, true]) {
+    t = await load({ reduced, delay: [900, 900] }); t.$("#botfab").click(); await new Promise(r => setTimeout(r, 1000)); // az üdvözlés lefut
+    const seen = new Set(); t.$("#botin").value = "van parkolás?"; t.$("#botform").dispatchEvent(new t.w.Event("submit", { cancelable: true }));
+    const t1 = Date.now(); let sawDots = false;
+    while (Date.now() - t1 < 1600) { const m = [...t.d.querySelectorAll(".m.bot:not(.typing)")].pop(); sawDots ||= !!t.d.querySelector(".typing"); if (m && /^A szalon/.test(m.firstChild?.data ?? m.textContent) || m?.querySelector("span")) seen.add(m.firstChild.data.length); await new Promise(r => setTimeout(r, 20)); }
+    assert.ok(sawDots, "előbb a jelzés (reduced=" + reduced + ")"); assert.ok(seen.size >= 3, "a szöveg fokozatosan nő, nem egyben jelenik meg (reduced=" + reduced + "): " + [...seen]);
+    assert.match(t.last(), /A szalon előtt fizetős parkolózóna van/); assert.equal(t.d.querySelector(".m.bot:last-of-type span"), null, "a végén tiszta szöveg marad");
+  }
 
   // 1d-2) alapértelmezett késleltetés: 1 és 4 mp között (a rövid üdvözlés ~1 mp, a hosszú válasz legfeljebb 4 mp)
-  t = await load({ reduced: false }); const t0 = Date.now(); t.$("#botfab").click();
-  await new Promise(r => setTimeout(r, 800)); assert.ok(t.d.querySelector(".typing") && !t.d.querySelector(".m.bot:not(.typing)"), "0,8 mp-nél még gépel");
-  while (t.d.querySelector(".typing") && Date.now() - t0 < 6000) await new Promise(r => setTimeout(r, 50));
+  t = await load({ reduced: false, delay: [1000, 4000] }); const t0 = Date.now(); t.$("#botfab").click();
+  await new Promise(r => setTimeout(r, 300)); assert.ok(t.d.querySelector(".typing") && !t.d.querySelector(".m.bot:not(.typing)"), "0,3 mp-nél még a jelzés látszik");
+  const busyTyping = () => t.d.querySelector(".typing, .m.bot span");
+  while (busyTyping() && Date.now() - t0 < 6000) await new Promise(r => setTimeout(r, 50));
   const took = Date.now() - t0; assert.ok(took >= 1000 && took <= 4400, "a válasz 1–4 mp-en belül érkezik: " + took); assert.ok(t.d.querySelector(".m.bot:not(.typing)"), "üdvözlés megjött");
   const q1 = Date.now(); t.$("#botin").value = "van parkolás?"; t.$("#botform").dispatchEvent(new t.w.Event("submit", { cancelable: true }));
   await new Promise(r => setTimeout(r, 200)); assert.equal(t.$("#chips").inert, true, "gépelés közben a régi gombok le vannak tiltva");
-  while (t.d.querySelector(".typing") && Date.now() - q1 < 6000) await new Promise(r => setTimeout(r, 50));
+  while (busyTyping() && Date.now() - q1 < 6000) await new Promise(r => setTimeout(r, 50));
   assert.ok(Date.now() - q1 <= 4400 && Date.now() - q1 >= 1000, "hosszabb válasz is legfeljebb 4 mp"); await new Promise(r => setTimeout(r, 30)); assert.equal(t.$("#chips").inert, false, "utána újra használhatók");
 
   // 1e) véletlen bejárás: gépelés és gombnyomás vegyesen, hiba nélkül (sosem fagy le, sosem dob kivételt)
@@ -183,26 +195,32 @@ async function load({ api = "", turnstile = "", reduced = true, config = "config
   // 4b) nyilvános naptár: csak olvasható, szabad időpontra kattintva előtöltött foglalás indul
   t = await load({ api: "https://api.test" }); await t.flush();
   assert.ok(t.$("#naptar") && t.d.querySelector(".links a[href='#naptar']"), "API-val van naptár és menüpont");
-  assert.ok(t.d.querySelectorAll("#cal .d.free").length >= 3, "szabad napok jelölve"); assert.ok(t.$("#cal .d.sel"), "az első szabad nap ki van jelölve");
+  assert.ok(t.d.querySelectorAll("#cal .d.free").length >= 3, "szabad napok jelölve"); assert.ok(!t.$("#cal .d.sel") && !t.$("#calday").textContent, "kattintás előtt nincs kijelölés és felugró tartalom");
+  assert.ok(t.$("#dayd") && t.$("#dayd #calday"), "a napi nézet felugró ablakban van");
+  const firstFree = t.$("#cal .d.free"); firstFree.click(); await t.flush(); assert.ok(t.$("#cal .d.sel"), "a kattintott nap kijelölve");
   assert.ok(!t.d.querySelector("#cal input, #calday input, #calday form"), "a naptár nem szerkeszthető");
-  const selDay = t.$("#cal .d.sel").dataset.d, slotBtns = [...t.d.querySelectorAll("#calday button.slot")]; assert.ok(slotBtns.length >= 4, "időpontok a kijelölt napra");
+  const selDay = firstFree.dataset.d, slotBtns = [...t.d.querySelectorAll("#calday button.slot")]; assert.ok(slotBtns.length >= 4, "időpontok a kijelölt napra");
   const t0txt = slotBtns[0].textContent, [h0, m0] = t0txt.split(":").map(Number);
   assert.ok(!t.$("#cal .d.o:not(:disabled)"), "a tartományon kívüli napok le vannak tiltva");
   slotBtns[0].click(); await t.flush();
   assert.ok(!t.$("#bot").hidden, "a chat megnyílt"); assert.ok([...t.d.querySelectorAll(".m.me")].some(m => m.textContent.includes(selDay) && m.textContent.includes(t0txt)), "a kért időpont a vendég üzenete");
   await t.chip("Férfi hajvágás"); assert.match(t.last(), /Hogy hívják|Ugye/, "szolgáltatás után már a névnél tart: a nap és az idő előtöltve (Kinél? sem kérdez)");
   assert.ok(!t.chips().includes("Éva"), "munkatársat nem kérdez");
+  t = await load({ api: "https://api.test" }); await t.flush(); t.$(`#cal .d[data-d='${selDay}']`).click(); await t.flush();
+  { const x = t.d.querySelector("#dayd .btn"); assert.ok(x, "van 'Időpontot foglalok erre a napra' gomb"); x.click(); await t.flush(); }
+  assert.ok(!t.$("#bot").hidden, "a nap gombja is a chatet nyitja"); assert.ok([...t.d.querySelectorAll(".m.me")].some(m => m.textContent.includes(selDay)), "a nap előtöltve");
+  await t.chip("Férfi hajvágás"); assert.ok(!t.chips().includes("Éva"), "a nap már megvan, munkatársat nem kérdez");
   const wholeDay = [[selDay, 0, 1440, "Éva"], [selDay, 0, 1440, "Dóri"]];
   t = await load({ api: "https://api.test", busy: wholeDay }); await t.flush();
   assert.ok(t.$(`#cal .d[data-d='${selDay}']`).classList.contains("full") || t.$(`#cal .d[data-d='${selDay}']`).classList.contains("o"), "a teljesen foglalt nap 'betelt'");
-  assert.notEqual(t.$("#cal .d.sel").dataset.d, selDay, "betelt napot nem jelöl ki alapból");
+  t.$(`#cal .d[data-d='${selDay}']`).click(); await t.flush(); assert.match(t.$("#calday").textContent, /már minden időpont betelt/, "betelt napra kattintva a felugró ablak ezt mondja"); assert.ok(!t.d.querySelector("#calday button.slot") && !t.d.querySelector("#dayd .btn"), "betelt napra nincs foglalás gomb");
   t = await load({ api: "https://api.test", busy: [[selDay, h0 * 60 + m0, 30, "Éva"], [selDay, h0 * 60 + m0, 30, "Dóri"]] }); await t.flush();
   t.$(`#cal .d[data-d='${selDay}']`).click(); await t.flush();
   assert.ok([...t.d.querySelectorAll("#calday span.slot.x")].some(x => x.textContent === t0txt), "a foglalt időpont áthúzva, nem kattintható");
   assert.ok(![...t.d.querySelectorAll("#calday button.slot")].some(x => x.textContent === t0txt)); assert.ok(!JSON.stringify(t.calls).includes("Teszt"), "személyes adat nincs");
   t.$("#calnext").click(); assert.ok(t.$("#calmon").textContent.length > 4, "hónapváltás");
   t = await load(); assert.ok(!t.$("#naptar") && !t.d.querySelector(".links a[href='#naptar']"), "API nélkül nincs naptár (nincs adat)");
-  t = await load({ tweak: c => c.demo = true }); await t.flush(); assert.ok(t.$("#naptar") && !t.calls.some(c => c[0] === "/busy"), "bemutatón szerver nélkül is van naptár, kitalált adattal");
+  t = await load({ tweak: c => c.demo = true }); await t.flush(); assert.ok(t.$("#naptar") && !t.calls.some(c => c[0] === "/busy"), "bemutatón szerver nélkül is van naptár, kitalált adattal"); t.$("#cal .d.free").click(); await t.flush();
   assert.ok(t.d.querySelectorAll("#cal .d.free").length >= 3 && t.d.querySelectorAll("#cal .d.full").length >= 1 && t.d.querySelectorAll("#calday .slot").length >= 4, "szabad és betelt napok is vannak");
   t = await load({ api: "https://api.test", config: "examples/bolt.config.js" }); assert.ok(!t.$("#naptar"), "foglalás nélküli boltnál nincs naptár");
 
@@ -220,7 +238,8 @@ async function load({ api = "", turnstile = "", reduced = true, config = "config
   t = await load({ google: true }); assert.ok(!t.calls.some(c => c[0] === "/reviews"), "API nélkül nem kér semmit");
 
   // 4d) telefon: a chat alatt az oldal rögzítve marad és a hely visszaáll; a látható területhez igazodik (billentyűzet)
-  t = await load({ phone: true, vv: { height: 800, offsetTop: 0 } }); t.$("#barmain").click(); await t.flush();
+  assert.ok(!t.d.querySelector(".bar, #barmain, #barcall"), "telefonon nincs alsó Hívás/Időpont sáv"); assert.ok(t.$("#botfab"), "a chat gomb marad");
+  t = await load({ phone: true, vv: { height: 800, offsetTop: 0 } }); t.$("#mainbtn").click(); await t.flush();
   assert.ok(t.d.body.classList.contains("lock"), "a háttér rögzítve"); assert.equal(t.d.body.style.top, "-420px", "a görgetési hely megőrizve");
   assert.equal(t.$("#bot").style.getPropertyValue("--vh"), "800px"); assert.equal(t.$("#bot").classList.contains("kb"), false);
   t.w.visualViewport.height = 380; t.w.visualViewport.offsetTop = 60; t.vvl.resize(); // megjelent a billentyűzet, a látható terület eltolódott

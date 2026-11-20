@@ -48,7 +48,7 @@
     <div class="nav"><button id="calprev" class="btn ghost sm" aria-label="Előző hónap">◀</button><b id="calmon"></b><button id="calnext" class="btn ghost sm" aria-label="Következő hónap">▶</button></div>
     <div id="cal" class="cal pub"></div>
     <p class="muted small"><span class="dot free"></span> van szabad időpont · <span class="dot full"></span> betelt / zárva</p>
-    <div id="calday" aria-live="polite"></div>
+    <p class="muted small">Kattintson egy napra a szabad időpontokhoz.</p>
   </section>
 
   <section class="rv" data-has="products">
@@ -96,11 +96,8 @@
   © <span id="year"></span> <span id="foot"></span> · <a href="adatvedelem.html">Adatkezelés</a> · Sütiket nem használunk, a látogatókat nem követjük.
 </footer>
 
-<nav class="bar">
-  <a id="barcall">Hívás</a>
-  <button id="barmain"></button>
-  <button data-bot="chat" aria-label="Chat megnyitása">💬</button>
-</nav>
+
+<dialog id="dayd" aria-label="Szabad időpontok"><div id="calday" aria-live="polite"></div><form method="dialog"><button aria-label="Bezár">✕</button></form></dialog>
 
 <dialog id="lb"><img alt=""><form method="dialog"><button aria-label="Bezár">✕</button></form></dialog>
 
